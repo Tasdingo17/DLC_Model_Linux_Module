@@ -48,7 +48,7 @@ struct dlc_sched_data {
     u32 mean_good_burst_len;    /* mean consequitive queuined packets */
 
     u32 limit;
-    u32 rate;
+    u64 rate;
 
     struct disttable *delay_dist;
 };
@@ -392,7 +392,11 @@ static int parse_attr(struct nlattr *tb[], int maxtype, struct nlattr *nla,
 }
 
 
-static const struct nla_policy dlc_policy[TCA_DLC_MAX + 1] = {};
+static const struct nla_policy dlc_policy[TCA_DLC_MAX + 1] = {
+    [TCA_DLC_RATE64]    = { .type = NLA_U64 },
+    [TCA_DLC_LATENCY64] = { .type = NLA_S64 },
+    [TCA_DLC_JITTER64]  = { .type = NLA_S64 },
+};
 
 
 /* Parse netlink message to set options */
@@ -437,6 +441,14 @@ static int dlc_change(struct Qdisc *sch, struct nlattr *opt,
     q->limit = qopt->limit;
     q->rate  = qopt->rate;
 
+    if (tb[TCA_NETEM_LATENCY64])
+		q->latency = nla_get_s64(tb[TCA_NETEM_LATENCY64]);
+    if (tb[TCA_NETEM_JITTER64])
+        q->jitter = nla_get_s64(tb[TCA_NETEM_JITTER64]);
+    if (tb[TCA_NETEM_RATE64])
+        q->rate = max_t(u64, q->rate, nla_get_u64(tb[TCA_NETEM_RATE64]));
+
+    
     /* capping jitter to the range acceptable by tabledist() */
     q->jitter = min_t(s64, abs(q->jitter), INT_MAX);
 
@@ -568,10 +580,21 @@ static int dlc_dump(struct Qdisc *sch, struct sk_buff *skb)
     qopt.mean_burst_len = q->mean_burst_len;
     qopt.mean_good_burst_len = q-> mean_good_burst_len;
     qopt.loss = q->loss;
-
-    qopt.rate = q->rate;
     qopt.limit = q->limit;
-    
+
+    if (nla_put(skb, TCA_NETEM_LATENCY64, sizeof(q->latency), &q->latency))
+        goto nla_put_failure;
+    if (nla_put(skb, TCA_NETEM_JITTER64, sizeof(q->jitter), &q->jitter))
+        goto nla_put_failure;
+
+    if (q->rate >= (1ULL << 32)) {
+        if (nla_put_u64_64bit(skb, TCA_DLC_RATE64, q->rate, TCA_DLC_PAD))
+            goto nla_put_failure;
+        qopt.rate = ~0U;
+    } else {
+        qopt.rate = q->rate;
+    }
+
     if (nla_put(skb, TCA_OPTIONS, sizeof(qopt), &qopt))
         goto nla_put_failure;
 

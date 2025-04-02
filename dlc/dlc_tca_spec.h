@@ -6,6 +6,9 @@ enum {
     TCA_DLC_UNSPEC,
     TCA_DLC_DELAY_DIST,
     TCA_DLC_PAD,
+    TCA_DLC_LATENCY64,
+    TCA_DLC_JITTER64,
+    TCA_DLC_RATE64,
     TCA_DLC_MODEL,      // for dumping
     TCA_MARKOV_CHAIN,   // for dumping
     TCA_MARKOV_PROBS,    // for dumping

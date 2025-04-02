@@ -2,13 +2,13 @@
 #define _MARKOV_CHAIN_H
 
 #include <linux/types.h>
-#include "states.h"
 
 #define MC_MAX_STATES 64  /* должно гарантировать вместимость */
 
+struct dlc_state;
 
 struct markov_chain {
-    struct dlc_state states[MC_MAX_STATES];
+    struct dlc_state* states;
     u32 num_states;
     u32 curr_state;
 
@@ -21,8 +21,8 @@ struct markov_chain {
 
 void markov_chain_init(struct markov_chain *mc, u32 num_states, 
                        struct dlc_state *states_array, 
-                       u16 transition_probs[MC_MAX_STATES][MC_MAX_STATES],
-                       u16 init_distribution[MC_MAX_STATES]);
+                       u16** transition_probs,
+                       u16* init_distribution);
 
 struct dlc_state* markov_chain_step(struct markov_chain *mc);
 

@@ -2,7 +2,6 @@
 
 ## Introduction
 Delay-loss correlation qdisc module for linux tc utility.
-Implemen
 
 ## Prerequisites
 
@@ -12,7 +11,7 @@ Bless rng
 
 1) Install modified tc (todo: link to repo)
 
-2) Build dlc_model (todo)
+2) Build dlc_model (todo) make
 
 ## Usage
 

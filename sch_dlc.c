@@ -38,7 +38,7 @@ struct dlc_sched_data {
     struct qdisc_watchdog watchdog;
 
     struct dlc_mod_data dlc_model;
-    s64 delay;
+    s64 latency;    // a.k.a delay
     s64 jitter;
     s64 mm1_rho;
     u32 jitter_steps;
@@ -74,16 +74,6 @@ static inline struct dlc_skb_cb *dlc_skb_cb(struct sk_buff *skb)
 
 static u64 packet_time_ns(u64 len, const struct dlc_sched_data *q)
 {
-    len += q->packet_overhead;
-
-    if (q->cell_size) {
-        u32 cells = reciprocal_divide(len, q->cell_size_reciprocal);
-
-        if (len > cells * q->cell_size)  /* extra cell needed for remainder */
-            cells++;
-        len = cells * (q->cell_size + q->cell_overhead);
-    }
-
     return div64_u64(len * NSEC_PER_SEC, q->rate);
 }
 
@@ -150,13 +140,14 @@ static int dlc_enqueue(struct sk_buff *skb, struct Qdisc *sch,
     /* We don't fill cb now as skb_unshare() may invalidate it */
     struct dlc_skb_cb *cb;
     struct sk_buff *segs = NULL;
-    unsigned int prev_len = qdisc_pkt_len(skb);
     int count = 1;
+    u64 now = ktime_get_ns();
+
+    struct dlc_packet_state pkt_state = dlc_mod_handle_packet(&(q->dlc_model), skb); // Call dlc_model
+    s64 delay = pkt_state.delay;
 
     /* Do not fool qdisc_drop_all() */
     skb->prev = NULL;
-
-    struct dlc_packet_state pkt_state = dlc_mod_handle_packet(&(q->dlc_model), skb);    // Call dlc_model
 
     if (pkt_state.loss) {
         printk(KERN_DEBUG "Loss state, drop packet\n");
@@ -168,8 +159,8 @@ static int dlc_enqueue(struct sk_buff *skb, struct Qdisc *sch,
         return NET_XMIT_SUCCESS | __NET_XMIT_BYPASS;
     }
 
-    /* If a delay is expected, orphan the skb. (orphaning usually takes
-    * place at TX completion time, so _before_ the link transit delay)
+    /* If a latency is expected, orphan the skb. (orphaning usually takes
+    * place at TX completion time, so _before_ the link transit latency)
     */
     if (q->latency || q->jitter || q->rate)
         skb_orphan_partial(skb);
@@ -184,8 +175,6 @@ static int dlc_enqueue(struct sk_buff *skb, struct Qdisc *sch,
     qdisc_qstats_backlog_inc(sch, skb);
 
     cb = dlc_skb_cb(skb);
-    u64 now = ktime_get_ns();
-    s64 delay = pkt_state.delay;
 
     if (q->rate) {
         struct dlc_skb_cb *last = NULL;
@@ -223,7 +212,6 @@ static int dlc_enqueue(struct sk_buff *skb, struct Qdisc *sch,
     }
 
     cb->time_to_send = now + delay;
-    ++q->counter;
     tfifo_enqueue(skb, sch);
 
     return NET_XMIT_SUCCESS;
@@ -454,10 +442,9 @@ static int dlc_change(struct Qdisc *sch, struct nlattr *opt,
 
     dlc_mod_init(&(q->dlc_model),
                  q->latency, q->jitter, q->mm1_rho, q->jitter_steps,
-                 q->p_loss, q->mu, q->mean_burst_len, q->mean_good_burst_len,
+                 q->loss, q->mu, q->mean_burst_len, q->mean_good_burst_len,
                  q->delay_dist);
 
-unlock:
     sch_tree_unlock(sch);
 
 table_free:
@@ -496,44 +483,49 @@ static void dlc_destroy(struct Qdisc *sch)
 static int dump_markov_chain(const struct dlc_sched_data *q, struct sk_buff *skb)
 {
     struct nlattr *nest;
-    struct dlc_mod_data* model = &(q->dlc_model);
+    const struct dlc_mod_data* model = &(q->dlc_model);
+    struct tc_dlc_simple_state simple_state;
+    struct tc_dlc_queue_state queue_state;
+    struct tc_dlc_loss_state loss_state;
+    psched_time_t delay_ticks, jitter_ticks;
 
     nest = nla_nest_start_noflag(skb, TCA_MARKOV_CHAIN);
     if (nest == NULL)
         goto nla_put_failure;
 
+
     if (model->main_chain.states[0].type != DLC_STATE_SIMPLE){
         pr_warning("dlc: invalid state[0] type %d\n", model->main_chain.states[0].type);
         goto nla_put_failure;
     }
-    struct tc_dlc_simple_state simple_state = {
-        .delay = min_t(psched_time_t, PSCHED_NS2TICKS(model->main_chain.states[0].simple.delay_mean), UINT_MAX),
-        .jitter = min_t(psched_time_t, PSCHED_NS2TICKS(model->main_chain.states[0].simple.jitter), UINT_MAX),
-        .delaydist_size = sizeof(model->main_chain.states[0].simple.dist),
-        .trans_probs = model->main_chain.transition_probs[0]
-    };
+    delay_ticks = PSCHED_NS2TICKS(model->main_chain.states[0].simple.delay_mean);
+    jitter_ticks = PSCHED_NS2TICKS(model->main_chain.states[0].simple.jitter);
+
+    simple_state.delay = delay_ticks > UINT_MAX ? UINT_MAX : delay_ticks;
+    simple_state.jitter = jitter_ticks > UINT_MAX ? UINT_MAX : jitter_ticks;
+    simple_state.delaydist_size = sizeof(model->main_chain.states[0].simple.distr);
+    memcpy(simple_state.trans_probs, model->main_chain.transition_probs[0], sizeof(simple_state.trans_probs));
     if (nla_put(skb, MC_STATE_SIMPLE, sizeof(simple_state), &simple_state))
         goto nla_put_failure;
+
 
     if (model->main_chain.states[1].type != DLC_STATE_QUEUE_V2){
         pr_warning("dlc: invalid state[1] type %d\n", model->main_chain.states[1].type);
         goto nla_put_failure;
     }
-    struct tc_dlc_queue_state queue_state = {
-        .mm1k_num_states = model->main_chain.states[1].queue.mm1k_chain.num_states,
-        .trans_probs = model->main_chain.transition_probs[1]
-    };
+    queue_state.mm1k_num_states = model->main_chain.states[1].queue.mm1k_chain.num_states;
+    memcpy(queue_state.trans_probs, model->main_chain.transition_probs[1], sizeof(queue_state.trans_probs));
     if (nla_put(skb, MC_STATE_QUEUE, sizeof(queue_state), &queue_state))
         goto nla_put_failure;
+
 
     if (model->main_chain.states[2].type != DLC_STATE_LOSS){
         pr_warning("dlc: invalid state[2] type %d\n", model->main_chain.states[2].type);
         goto nla_put_failure;
     }
-    struct tc_dlc_loss_state loss_state = {
-        .max_delay = min_t(psched_time_t, PSCHED_NS2TICKS(model->main_chain.states[3].loss.max_delay), UINT_MAX) ,
-        .trans_probs = model->main_chain.transition_probs[2]
-    };
+    delay_ticks = PSCHED_NS2TICKS(model->main_chain.states[2].loss.max_delay);
+    loss_state.max_delay = delay_ticks > UINT_MAX ? UINT_MAX : delay_ticks;
+    memcpy(loss_state.trans_probs, model->main_chain.transition_probs[2], sizeof(loss_state.trans_probs));
     if (nla_put(skb, MC_STATE_LOSS, sizeof(loss_state), &loss_state))
         goto nla_put_failure;
 

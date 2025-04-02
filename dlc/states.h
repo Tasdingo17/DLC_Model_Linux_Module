@@ -21,7 +21,7 @@ typedef enum {
 /* {delay, loss} ~ {const, 0} */
 struct dlc_const_state {
     s64 delay;
-}
+};
 
 /* {delay, loss} ~ {norm(), 0} */
 struct dlc_simple_state {
@@ -57,20 +57,20 @@ struct dlc_packet_state {
     bool loss;
 };
 
-void dlc_const_state_init(struct dlc_const_state *state, s64 delay);
+int dlc_const_state_init(struct dlc_const_state *state, s64 delay);
 struct dlc_packet_state dlc_const_state_step(struct dlc_const_state *state);
 
-void dlc_simple_state_init(struct dlc_simple_state *state, 
+int dlc_simple_state_init(struct dlc_simple_state *state, 
                            s64 delay_mean,
                            s64 jitter,
                            struct disttable *delay_dist);
 struct dlc_packet_state dlc_simple_state_step(struct dlc_simple_state *state);
 
-void dlc_loss_state_init(struct dlc_loss_state *state, s64 max_delay);
+int dlc_loss_state_init(struct dlc_loss_state *state, s64 max_delay);
 struct dlc_packet_state dlc_loss_state_step(struct dlc_loss_state *state);
 
 // rho = lambda/mu (general naming for M/M/1/k); scaled by 10000... (% 10000)
-void dlc_queue_state_v2_init(struct dlc_queue_state_v2 *state, u32 num_steps, s64 delay, s64 jitter, s64 rho);
+int dlc_queue_state_v2_init(struct dlc_queue_state_v2 *state, u32 num_steps, s64 delay, s64 jitter, s64 rho);
 struct dlc_packet_state dlc_queue_state_v2_step(struct dlc_queue_state_v2 *state);
 
 #endif

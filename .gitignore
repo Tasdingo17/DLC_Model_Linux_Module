@@ -1,0 +1,7 @@
+**/.sch*
+**/*.mod
+**/*.mod.*
+**/*.o
+**/*.o.*
+Module.symvers
+modules.order

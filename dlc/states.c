@@ -56,35 +56,31 @@ int dlc_queue_state_v2_init(struct dlc_queue_state_v2 *state, u32 num_steps, s64
     s64 p_min, p_plus;
     s64 delay_step = jitter / num_steps;
     u32 k_states = num_steps + 1;
-    struct dlc_state* const_states;
+    struct dlc_const_state* const_states;
     u16* init_probs;
-    u16** trans_probs;
-
+    u16 (*trans_probs)[MC_MAX_STATES];  
 
     // allocate memory since kernel stack is too small
-    const_states = kvmalloc(sizeof(struct dlc_state) * MC_MAX_STATES, GFP_KERNEL);
+    const_states = kvmalloc(sizeof(struct dlc_const_state) * MC_MAX_STATES, GFP_KERNEL);
     if (!const_states)
         return -ENOMEM;
     init_probs = kvmalloc(sizeof(u16) * MC_MAX_STATES, GFP_KERNEL);
-    if (!init_probs)
+    if (!init_probs){
+        kvfree(const_states);
         return -ENOMEM;
-    trans_probs = kvmalloc_array(MC_MAX_STATES, sizeof(u16*) , GFP_KERNEL);
-    if (!trans_probs)
+    }
+    trans_probs = kvmalloc(sizeof(u16[MC_MAX_STATES][MC_MAX_STATES]), GFP_KERNEL);
+    if (!trans_probs) {
+        kvfree(const_states);
+        kvfree(init_probs);
         return -ENOMEM;
-    for (i = 0; i < MC_MAX_STATES; i++) {
-        trans_probs[i] = kvmalloc(sizeof(u16) * MC_MAX_STATES, GFP_KERNEL);
-        if (!trans_probs[i]) {
-            // Cleanup already allocated rows
-            while (i-- > 0)
-                kvfree(trans_probs[i]);
-            kvfree(trans_probs);
-            return -ENOMEM;
-        }
-    }   
+    }
+    // struct dlc_const_state const_states[MC_MAX_STATES];
+    // u16 init_probs[MC_MAX_STATES];
+    // u16 trans_probs[MC_MAX_STATES][MC_MAX_STATES]; 
 
     for (i = 0; i < k_states; i++) {
-        const_states[i].type = DLC_STATE_CONST;
-        dlc_const_state_init(&(const_states[i].cnst), delay + i * delay_step);
+        dlc_const_state_init(&(const_states[i]), delay + i * delay_step);
     }
 
     p_min = (10000 * 10000) / (10000 + rho);    // todo: check scaling just in case
@@ -99,19 +95,16 @@ int dlc_queue_state_v2_init(struct dlc_queue_state_v2 *state, u32 num_steps, s64
     }
 
     init_probs[0] = 10000;  // TODO: general const for percentage scale
-    markov_chain_init(&state->mm1k_chain, k_states, const_states, trans_probs, init_probs);  // note: memcpy on arrays
+    markov_chain_const_init(&state->mm1k_chain, k_states, const_states, trans_probs, init_probs);  // note: memcpy on arrays
 
     // cleanup since markov_chain_init copy arrays to itself
     kvfree(const_states);
     kvfree(init_probs);
-    for (i = 0; i < MC_MAX_STATES; i++) {
-        kvfree(trans_probs[i]);   
-    }
     kvfree(trans_probs);
     return 0;
 }
 
 struct dlc_packet_state dlc_queue_state_v2_step(struct dlc_queue_state_v2 *state) {
-    struct dlc_state *curr_state = markov_chain_step(&state->mm1k_chain);
-    return dlc_const_state_step(&(curr_state->cnst));
+    struct dlc_const_state *curr_state = markov_chain_const_step(&state->mm1k_chain);
+    return dlc_const_state_step(curr_state);
 }

@@ -10,7 +10,7 @@ obj-m += sch_dlc_qdisc.o
 # DLC_OBJS += $(patsubst %.c,%.o,$(DLC_SRCS))
 # $(info DLC_OBJS: $(DLC_OBJS))
 
-DLC_OBJS = dlc/dlc_random.o dlc/markov_chain.o dlc/states.o dlc/dlc_mod.c
+DLC_OBJS = dlc/dlc_random.o dlc/markov_chain.o dlc/states.o dlc/dlc_mod.o
 
 sch_dlc_qdisc-objs = sch_dlc.o $(DLC_OBJS)
 

@@ -32,7 +32,12 @@ struct dlc_simple_state {
 
 /* {delay, loss} ~ {M/M/1/K(), 0} */
 struct dlc_queue_state_v2 {
-    struct markov_chain mm1k_chain;
+    /* 
+    Could use pure markov_chain, but cyclic dependency require big amount of memory.
+    If still want to use it, note that function stack size in kernel is small.
+    Will require a little more effort on memory management: dynamic allocation and free.
+    */
+    struct markov_chain_const mm1k_chain;
 };
 
 /* {delay, loss} ~ {max_delay, 1} */

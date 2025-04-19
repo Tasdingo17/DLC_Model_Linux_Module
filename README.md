@@ -28,13 +28,13 @@ make
 
 3) Install dlc module:
 ```
-sudo insmod sch_dlc.ko
+sudo insmod sch_dlc_qdisc.ko
 ```
-Ensure module successfully installed: `lsmod | grep sch_dlc` (or `dmesg | tail` for kernel logs)
+Ensure module successfully installed: `lsmod | grep sch_dlc_qdisc` (or `dmesg | tail` for kernel logs)
 
 4) (Optional) remove module after work:
 ```
-sudo rmmod sch_dlc
+sudo rmmod sch_dlc_qdisc
 ```
 
 ## Usage example

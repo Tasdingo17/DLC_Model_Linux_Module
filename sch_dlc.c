@@ -429,12 +429,12 @@ static int dlc_change(struct Qdisc *sch, struct nlattr *opt,
     q->limit = qopt->limit;
     q->rate  = qopt->rate;
 
-    if (tb[TCA_NETEM_LATENCY64])
-		q->latency = nla_get_s64(tb[TCA_NETEM_LATENCY64]);
-    if (tb[TCA_NETEM_JITTER64])
-        q->jitter = nla_get_s64(tb[TCA_NETEM_JITTER64]);
-    if (tb[TCA_NETEM_RATE64])
-        q->rate = max_t(u64, q->rate, nla_get_u64(tb[TCA_NETEM_RATE64]));
+    if (tb[TCA_DLC_LATENCY64])
+		q->latency = nla_get_s64(tb[TCA_DLC_LATENCY64]);
+    if (tb[TCA_DLC_JITTER64])
+        q->jitter = nla_get_s64(tb[TCA_DLC_JITTER64]);
+    if (tb[TCA_DLC_RATE64])
+        q->rate = max_t(u64, q->rate, nla_get_u64(tb[TCA_DLC_RATE64]));
 
     
     /* capping jitter to the range acceptable by tabledist() */

@@ -3,5 +3,6 @@
 **/*.mod.*
 **/*.o
 **/*.o.*
+*.ko
 Module.symvers
 modules.order

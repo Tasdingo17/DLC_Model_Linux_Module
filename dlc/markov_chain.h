@@ -3,7 +3,7 @@
 
 #include <linux/types.h>
 
-#define MC_MAX_STATES 64  /* должно гарантировать вместимость */
+#define MC_MAX_STATES 32  /* должно гарантировать вместимость */
 
 struct dlc_state;
 struct dlc_const_state;

@@ -397,6 +397,8 @@ static int dlc_change(struct Qdisc *sch, struct nlattr *opt,
     struct tc_dlc_qopt *qopt;
     int ret;
 
+    printk(KERN_DEBUG "Dlc: parsing params from netlink message\n");
+
     if (opt == NULL)
         return -EINVAL;
 
@@ -656,7 +658,7 @@ static const struct Qdisc_class_ops dlc_class_ops = {
 
 /* TODO: check ahahahah*/
 static struct Qdisc_ops dlc_qdisc_ops __read_mostly = {
-    .id    =  "dlc_qdisc",
+    .id    =  "dlc",
     .cl_ops    =  &dlc_class_ops,
     .priv_size  =  sizeof(struct dlc_sched_data),
     .enqueue  =  dlc_enqueue,

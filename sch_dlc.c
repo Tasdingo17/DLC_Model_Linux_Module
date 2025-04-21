@@ -457,6 +457,7 @@ table_free:
 static int dlc_init(struct Qdisc *sch, struct nlattr *opt,
             struct netlink_ext_ack *extack)
 {
+    printk(KERN_DEBUG "Dlc init\n");
     struct dlc_sched_data *q = qdisc_priv(sch);
     int ret;
 
@@ -576,9 +577,9 @@ static int dlc_dump(struct Qdisc *sch, struct sk_buff *skb)
     qopt.loss = q->loss;
     qopt.limit = q->limit;
 
-    if (nla_put(skb, TCA_NETEM_LATENCY64, sizeof(q->latency), &q->latency))
+    if (nla_put(skb, TCA_DLC_LATENCY64, sizeof(q->latency), &q->latency))
         goto nla_put_failure;
-    if (nla_put(skb, TCA_NETEM_JITTER64, sizeof(q->jitter), &q->jitter))
+    if (nla_put(skb, TCA_DLC_JITTER64, sizeof(q->jitter), &q->jitter))
         goto nla_put_failure;
 
     if (q->rate >= (1ULL << 32)) {

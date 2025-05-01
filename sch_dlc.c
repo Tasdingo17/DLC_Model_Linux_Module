@@ -360,31 +360,31 @@ static int get_dist_table(struct disttable **tbl, const struct nlattr *attr)
 }
 
 
-static int parse_attr(struct nlattr *tb[], int maxtype, struct nlattr *nla,
-            const struct nla_policy *policy, int len)
-{
-    int nested_len = nla_len(nla) - NLA_ALIGN(len);
+// static int parse_attr(struct nlattr *tb[], int maxtype, struct nlattr *nla,
+//             const struct nla_policy *policy, int len)
+// {
+//     int nested_len = nla_len(nla) - NLA_ALIGN(len);
 
-    if (nested_len < 0) {
-        pr_info("dlc: invalid attributes len %d\n", nested_len);
-        return -EINVAL;
-    }
+//     if (nested_len < 0) {
+//         pr_info("dlc: invalid attributes len %d\n", nested_len);
+//         return -EINVAL;
+//     }
 
-    if (nested_len >= nla_attr_size(0))
-        return nla_parse_deprecated(tb, maxtype,
-                        nla_data(nla) + NLA_ALIGN(len),
-                        nested_len, policy, NULL);
+//     if (nested_len >= nla_attr_size(0))
+//         return nla_parse_deprecated(tb, maxtype,
+//                         nla_data(nla) + NLA_ALIGN(len),
+//                         nested_len, policy, NULL);
 
-    memset(tb, 0, sizeof(struct nlattr *) * (maxtype + 1));
-    return 0;
-}
+//     memset(tb, 0, sizeof(struct nlattr *) * (maxtype + 1));
+//     return 0;
+// }
 
 
-static const struct nla_policy dlc_policy[TCA_DLC_MAX + 1] = {
-    [TCA_DLC_RATE64]    = { .type = NLA_U64 },
-    [TCA_DLC_LATENCY64] = { .type = NLA_S64 },
-    [TCA_DLC_JITTER64]  = { .type = NLA_S64 },
-};
+// static const struct nla_policy dlc_policy[TCA_DLC_MAX + 1] = {
+//     [TCA_DLC_RATE64]    = { .type = NLA_U64 },
+//     [TCA_DLC_LATENCY64] = { .type = NLA_S64 },
+//     [TCA_DLC_JITTER64]  = { .type = NLA_S64 },
+// };
 
 
 /* Parse netlink message to set options */
@@ -395,22 +395,22 @@ static int dlc_change(struct Qdisc *sch, struct nlattr *opt,
     struct nlattr *tb[TCA_DLC_MAX + 1];
     struct disttable *delay_dist = NULL;
     struct tc_dlc_qopt *qopt;
-    int ret;
+    int ret = 0;
 
-    printk(KERN_DEBUG "Dlc: parsing params from netlink message\n");
-
-    if (opt == NULL)
+    printk(KERN_INFO "Dlc: parsing params from netlink message\n");
+    if (!opt)
         return -EINVAL;
-
+    if (nla_len(opt) < sizeof(*qopt))
+        return -EINVAL;
     qopt = nla_data(opt);
-    ret = parse_attr(tb, TCA_DLC_MAX, opt, dlc_policy, sizeof(*qopt));
-    if (ret < 0)
-        return ret;
+    nla_parse(tb, TCA_DLC_MAX, nla_data(opt) + NLA_ALIGN(sizeof(*qopt)), nla_len(opt) - NLA_ALIGN(sizeof(*qopt)), NULL, NULL);
+    printk(KERN_INFO "Dlc: message parsed, set to dlc fields\n");
 
     if (tb[TCA_DLC_DELAY_DIST]) {
         ret = get_dist_table(&delay_dist, tb[TCA_DLC_DELAY_DIST]);
         if (ret)
             goto table_free;
+        printk(KERN_INFO "Dlc: parsed delay_dist\n");
     }
 
     sch_tree_lock(sch);
@@ -436,16 +436,19 @@ static int dlc_change(struct Qdisc *sch, struct nlattr *opt,
     if (tb[TCA_DLC_JITTER64])
         q->jitter = nla_get_s64(tb[TCA_DLC_JITTER64]);
     if (tb[TCA_DLC_RATE64])
-        q->rate = max_t(u64, q->rate, nla_get_u64(tb[TCA_DLC_RATE64]));
+        q->rate = nla_get_u64(tb[TCA_DLC_RATE64]);
 
-    
     /* capping jitter to the range acceptable by tabledist() */
     q->jitter = min_t(s64, abs(q->jitter), INT_MAX);
+
+    printk(KERN_INFO "Dlc: Got params: limit=%u, latency=%lld, loss=%u\n", q->limit, q->latency, q->loss);
 
     dlc_mod_init(&(q->dlc_model),
                  q->latency, q->jitter, q->mm1_rho, q->jitter_steps,
                  q->loss, q->mu, q->mean_burst_len, q->mean_good_burst_len,
                  q->delay_dist);
+
+    printk(KERN_INFO "Dlc: dlc_mod_init finished\n");
 
     sch_tree_unlock(sch);
 
@@ -457,9 +460,10 @@ table_free:
 static int dlc_init(struct Qdisc *sch, struct nlattr *opt,
             struct netlink_ext_ack *extack)
 {
-    printk(KERN_DEBUG "Dlc init\n");
     struct dlc_sched_data *q = qdisc_priv(sch);
     int ret;
+
+    printk(KERN_DEBUG "Dlc init\n");
 
     qdisc_watchdog_init(&q->watchdog, sch);
 
@@ -681,6 +685,7 @@ static int __init dlc_module_init(void)
 }
 static void __exit dlc_module_exit(void)
 {
+    pr_info("dlc_model unregister \n");
     unregister_qdisc(&dlc_qdisc_ops);
 }
 module_init(dlc_module_init)

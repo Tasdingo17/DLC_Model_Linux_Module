@@ -1,0 +1,36 @@
+.PHONY: all setup-interfaces setup check-setup test-ping cleanup rebuild
+
+all: setup
+
+setup-interfaces:
+	sudo ip netns add h1
+	sudo ip netns exec h1 ip link set dev lo up
+	sudo ip link add veth0 type veth peer name veth1
+	sudo ip link set veth1 netns h1
+
+	sudo ip addr add 10.1.1.1/24 dev veth0
+	sudo ip link set dev veth0 up
+	sudo ip netns exec h1 ip addr add 10.1.1.2/24 dev veth1
+	sudo ip netns exec h1 ip link set dev veth1 up
+
+setup: setup-interfaces
+	sudo insmod DLC_Model_module/sch_dlc_qdisc.ko
+	sudo iproute2_dlc/tc/tc qdisc add dev veth0 root dlc limit 10000 delay 10ms 2ms loss 1% mu 30% mean_burst_len 3 mean_good_burst_len 15 rate 50mbit
+
+check-setup:
+	sudo ip -br addr show veth0
+	sudo ip netns exec h1 ip -br addr show veth1
+	tc -s qdisc show dev veth0
+
+test-ping:
+	ping -I veth0 10.1.1.2 -c 3 -i 0.2
+
+rebuild:
+	cd DLC_Model_module && $(MAKE)
+	cd iproute2_dlc && $(MAKE)
+
+cleanup:
+	sudo tc qdisc del dev veth0 root
+	sudo ip link del veth0
+	sudo ip netns del h1
+	sudo rmmod sch_dlc_qdisc

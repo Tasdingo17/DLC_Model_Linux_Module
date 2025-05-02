@@ -5,9 +5,9 @@
 #include <linux/string.h>
 #include <linux/kernel.h>
 
-static u32 select_initial_state(u32 num_states, u16 init_distribution[]) {
-    u16 rnd = get_random_u32() % 10000;
-    u16 cum_prob = 0;
+static u32 select_initial_state(u32 num_states, u32 init_distribution[]) {
+    u32 rnd = get_random_u32() % DLC_PROB_SCALE;
+    u32 cum_prob = 0;
     u32 i;
 
     for (i = 0; i < num_states; i++) {
@@ -18,10 +18,10 @@ static u32 select_initial_state(u32 num_states, u16 init_distribution[]) {
     return num_states - 1; /* защита от ошибки округления */
 }
 
-static u32 calc_next_state_idx(u32 curr_state, u32 num_states, u16 transition_probs[][MC_MAX_STATES]){
-    u16 rnd = get_random_u32() % 10000;
+static u32 calc_next_state_idx(u32 curr_state, u32 num_states, u32 transition_probs[][MC_MAX_STATES]){
+    u32 rnd = get_random_u32() % DLC_PROB_SCALE;
     u32 next_state = num_states;
-    u16 cum_prob = 0;
+    u32 cum_prob = 0;
     u32 i;
 
     for (i = 0; i < num_states; i++) {
@@ -40,8 +40,8 @@ static u32 calc_next_state_idx(u32 curr_state, u32 num_states, u16 transition_pr
 
 void markov_chain_init(struct markov_chain *mc, u32 num_states, 
                        struct dlc_state *states_array, 
-                       u16 transition_probs[][MC_MAX_STATES],
-                       u16 init_distribution[MC_MAX_STATES])
+                       u32 transition_probs[][MC_MAX_STATES],
+                       u32 init_distribution[MC_MAX_STATES])
 {
     u32 i, j;
 
@@ -61,7 +61,7 @@ void markov_chain_init(struct markov_chain *mc, u32 num_states,
         }
     }
 
-    memcpy(mc->init_distribution, init_distribution, sizeof(u16) * num_states);
+    memcpy(mc->init_distribution, init_distribution, sizeof(u32) * num_states);
 
     /* выбор начального состояния согласно начальному распределению */
     mc->curr_state = select_initial_state(num_states, mc->init_distribution);
@@ -81,8 +81,8 @@ void markov_chain_destroy(struct markov_chain *mc){
 
 void markov_chain_const_init(struct markov_chain_const *mc, u32 num_states, 
     struct dlc_const_state *states_array, 
-    u16 transition_probs[][MC_MAX_STATES],
-    u16 init_distribution[MC_MAX_STATES])
+    u32 transition_probs[][MC_MAX_STATES],
+    u32 init_distribution[MC_MAX_STATES])
 {
     u32 i, j;
 
@@ -102,7 +102,7 @@ void markov_chain_const_init(struct markov_chain_const *mc, u32 num_states,
             mc->transition_probs[i][j] = transition_probs[i][j];
         }
     }
-    memcpy(mc->init_distribution, init_distribution, sizeof(u16) * num_states);
+    memcpy(mc->init_distribution, init_distribution, sizeof(u32) * num_states);
     mc->curr_state = select_initial_state(num_states, mc->init_distribution);
 }
 

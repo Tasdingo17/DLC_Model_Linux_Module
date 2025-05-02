@@ -150,7 +150,8 @@ static int dlc_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 
     struct dlc_packet_state pkt_state = dlc_mod_handle_packet(&(q->dlc_model), skb); // Call dlc_model
     s64 delay = pkt_state.delay;
-    printk(KERN_DEBUG "Packet state: delay=%lld, loss=%d\n", pkt_state.delay, pkt_state.loss);
+    //printk(KERN_DEBUG "Dlc packet state: delay=%lld, loss=%d, curr_state=%u\n", 
+    //        pkt_state.delay, pkt_state.loss, q->dlc_model.main_chain.curr_state);
 
     /* Do not fool qdisc_drop_all() */
     skb->prev = NULL;
@@ -590,20 +591,14 @@ static int dlc_dump(struct Qdisc *sch, struct sk_buff *skb)
         goto nla_put_failure;
     if (nla_put(skb, TCA_DLC_JITTER64, sizeof(q->jitter), &q->jitter))
         goto nla_put_failure;
-
-    if (q->rate >= (1ULL << 32)) {
-        if (nla_put_u64_64bit(skb, TCA_DLC_RATE64, q->rate, TCA_DLC_PAD))
-            goto nla_put_failure;
-        qopt.rate = ~0U;
-    } else {
-        qopt.rate = q->rate;
-    }
+    if (nla_put_u64_64bit(skb, TCA_DLC_RATE64, q->rate, TCA_DLC_PAD))
+        goto nla_put_failure;
 
     if (nla_put(skb, TCA_OPTIONS, sizeof(qopt), &qopt))
         goto nla_put_failure;
 
-    if (dump_dlc_model(q, skb) != 0)
-        goto nla_put_failure;
+    // if (dump_dlc_model(q, skb) != 0)
+    //     goto nla_put_failure;
 
     return nla_nest_end(skb, nla);
 

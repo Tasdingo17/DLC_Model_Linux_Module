@@ -57,44 +57,45 @@ int dlc_queue_state_v2_init(struct dlc_queue_state_v2 *state, u32 num_steps, s64
     s64 delay_step = jitter / num_steps;
     u32 k_states = num_steps + 1;
     struct dlc_const_state* const_states;
-    u16* init_probs;
-    u16 (*trans_probs)[MC_MAX_STATES];  
+    u32* init_probs;
+    u32 (*trans_probs)[MC_MAX_STATES];  
 
     // allocate memory since kernel stack is too small
     const_states = kvmalloc(sizeof(struct dlc_const_state) * MC_MAX_STATES, GFP_KERNEL);
     if (!const_states)
         return -ENOMEM;
-    init_probs = kvmalloc(sizeof(u16) * MC_MAX_STATES, GFP_KERNEL);
+    init_probs = kvmalloc(sizeof(u32) * MC_MAX_STATES, GFP_KERNEL);
     if (!init_probs){
         kvfree(const_states);
         return -ENOMEM;
     }
-    trans_probs = kvmalloc(sizeof(u16[MC_MAX_STATES][MC_MAX_STATES]), GFP_KERNEL);
+    trans_probs = kvmalloc(sizeof(u32[MC_MAX_STATES][MC_MAX_STATES]), GFP_KERNEL);
     if (!trans_probs) {
         kvfree(const_states);
         kvfree(init_probs);
         return -ENOMEM;
     }
     // struct dlc_const_state const_states[MC_MAX_STATES];
-    // u16 init_probs[MC_MAX_STATES];
-    // u16 trans_probs[MC_MAX_STATES][MC_MAX_STATES]; 
+    // u32 init_probs[MC_MAX_STATES];
+    // u32 trans_probs[MC_MAX_STATES][MC_MAX_STATES]; 
 
     for (i = 0; i < k_states; i++) {
         dlc_const_state_init(&(const_states[i]), delay + i * delay_step);
     }
 
-    p_min = (10000 * 10000) / (10000 + rho);    // todo: check scaling just in case
-    p_plus = rho * 10000 / (10000 + rho);    
-    trans_probs[0][0] = 10000 - p_plus;
+    p_min = ((s64) DLC_PROB_SCALE * DLC_PROB_SCALE) / (DLC_PROB_SCALE + rho);    // todo: check scaling just in case
+    p_plus = ((s64) DLC_PROB_SCALE * rho) / (DLC_PROB_SCALE + rho);    
+    printk(KERN_DEBUG "DLC: state_queue p_min=%lld, p_plus=%lld\n", p_min, p_plus);
+    trans_probs[0][0] = DLC_PROB_SCALE - p_plus;
     trans_probs[0][1] = p_plus;
-    trans_probs[k_states - 1][k_states - 1] = 10000 - p_min;
+    trans_probs[k_states - 1][k_states - 1] = DLC_PROB_SCALE - p_min;
     trans_probs[k_states - 1][k_states - 2] = p_min;
     for (i = 1; i < k_states - 1; i++){
         trans_probs[i][i-1] = p_min;
         trans_probs[i][i+1] = p_plus;
     }
 
-    init_probs[0] = 10000;  // TODO: general const for percentage scale
+    init_probs[0] = DLC_PROB_SCALE;
     markov_chain_const_init(&state->mm1k_chain, k_states, const_states, trans_probs, init_probs);  // note: memcpy on arrays
 
     // cleanup since markov_chain_init copy arrays to itself

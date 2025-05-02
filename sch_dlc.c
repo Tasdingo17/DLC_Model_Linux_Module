@@ -64,6 +64,11 @@ struct dlc_skb_cb {
     u64          time_to_send;
 };
 
+static void dist_free(struct disttable *d)
+{
+    kvfree(d);
+}
+
 static inline struct dlc_skb_cb *dlc_skb_cb(struct sk_buff *skb)
 {
     /* we assume we can use skb next/prev/tstamp as storage for rb_node */
@@ -326,13 +331,13 @@ static void dlc_reset(struct Qdisc *sch)
     tfifo_reset(sch);
     if (q->qdisc)
         qdisc_reset(q->qdisc);
+    if (q->delay_dist){
+        dist_free(q->delay_dist);
+        q->delay_dist = NULL;
+    }
     qdisc_watchdog_cancel(&q->watchdog);
 }
 
-static void dist_free(struct disttable *d)
-{
-    kvfree(d);
-}
 
 /*
 * Distribution data is a variable size payload containing
@@ -483,6 +488,7 @@ static void dlc_destroy(struct Qdisc *sch)
     if (q->qdisc)
         qdisc_put(q->qdisc);
     dist_free(q->delay_dist);
+    q->delay_dist = NULL;
     dlc_mod_destroy(&(q->dlc_model));
 }
 

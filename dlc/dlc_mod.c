@@ -58,10 +58,9 @@ int dlc_mod_init(
     if (!states)
         return -ENOMEM;
 
-    dlc_data->delay_dist.size = dist->size;
-    memcpy(dlc_data->delay_dist.table, dist->table, sizeof(u16) * dist->size);
+    dlc_data->delay_dist = dist;
 
-    dlc_simple_state_init(&simple_state, delay, jitter, &(dlc_data->delay_dist));
+    dlc_simple_state_init(&simple_state, delay, jitter / jitter_steps, dlc_data->delay_dist);
     states[0].type = DLC_STATE_SIMPLE;
     states[0].simple = simple_state;
 
@@ -123,7 +122,6 @@ struct dlc_packet_state dlc_mod_handle_packet(struct dlc_mod_data *dlc_data, str
 
 void dlc_mod_destroy(struct dlc_mod_data *dlc_data){
     int i;
-    kvfree(&(dlc_data->delay_dist));
     for (i = 0; i < dlc_data->main_chain.num_states; i++){
         if (dlc_data->main_chain.states[i].type == DLC_STATE_QUEUE_V2){ // write here all states with internal chains
             markov_chain_const_destroy(&(dlc_data->main_chain.states[i].queue.mm1k_chain));

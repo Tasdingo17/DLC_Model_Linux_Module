@@ -145,6 +145,7 @@ static int dlc_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 
     struct dlc_packet_state pkt_state = dlc_mod_handle_packet(&(q->dlc_model), skb); // Call dlc_model
     s64 delay = pkt_state.delay;
+    printk(KERN_DEBUG "Packet state: delay=%lld, loss=%d\n", pkt_state.delay, pkt_state.loss);
 
     /* Do not fool qdisc_drop_all() */
     skb->prev = NULL;
@@ -404,13 +405,12 @@ static int dlc_change(struct Qdisc *sch, struct nlattr *opt,
         return -EINVAL;
     qopt = nla_data(opt);
     nla_parse(tb, TCA_DLC_MAX, nla_data(opt) + NLA_ALIGN(sizeof(*qopt)), nla_len(opt) - NLA_ALIGN(sizeof(*qopt)), NULL, NULL);
-    printk(KERN_INFO "Dlc: message parsed, set to dlc fields\n");
 
     if (tb[TCA_DLC_DELAY_DIST]) {
         ret = get_dist_table(&delay_dist, tb[TCA_DLC_DELAY_DIST]);
         if (ret)
             goto table_free;
-        printk(KERN_INFO "Dlc: parsed delay_dist\n");
+        printk(KERN_DEBUG "Dlc: parsed delay_dist\n");
     }
 
     sch_tree_lock(sch);
@@ -441,14 +441,13 @@ static int dlc_change(struct Qdisc *sch, struct nlattr *opt,
     /* capping jitter to the range acceptable by tabledist() */
     q->jitter = min_t(s64, abs(q->jitter), INT_MAX);
 
-    printk(KERN_INFO "Dlc: Got params: limit=%u, latency=%lld, loss=%u\n", q->limit, q->latency, q->loss);
+    printk(KERN_DEBUG "Dlc: Got params: limit=%u, latency=%lld, jitter=%lld, jitter_steps=%u, loss=%u, mu=%u\n",
+        q->limit, q->latency, q->jitter, q->jitter_steps, q->loss, q->mu);
 
     dlc_mod_init(&(q->dlc_model),
                  q->latency, q->jitter, q->mm1_rho, q->jitter_steps,
                  q->loss, q->mu, q->mean_burst_len, q->mean_good_burst_len,
                  q->delay_dist);
-
-    printk(KERN_INFO "Dlc: dlc_mod_init finished\n");
 
     sch_tree_unlock(sch);
 

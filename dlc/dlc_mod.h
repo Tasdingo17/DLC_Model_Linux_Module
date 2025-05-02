@@ -13,7 +13,7 @@ struct dlc_mod_data {
     struct markov_chain main_chain;
 
     /* Pre-built distribution tables (from netem), passed from userspace setup */
-    struct disttable delay_dist;    // copied on init
+    struct disttable* delay_dist;   /* read only */
 };
 
 /* Called on init, from tc/netlink or sysfs */

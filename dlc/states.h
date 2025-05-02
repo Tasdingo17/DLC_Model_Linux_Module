@@ -27,7 +27,7 @@ struct dlc_const_state {
 struct dlc_simple_state {
     s64 delay_mean;       /* среднее значение задержки в мкс */
     s64 jitter;           /* jitter в мкс */
-    struct disttable* distr;
+    struct disttable* distr;    /* read-only */
 };
 
 /* {delay, loss} ~ {M/M/1/K(), 0} */

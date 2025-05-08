@@ -150,14 +150,14 @@ static int dlc_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 
     struct dlc_packet_state pkt_state = dlc_mod_handle_packet(&(q->dlc_model), skb); // Call dlc_model
     s64 delay = pkt_state.delay;
-    //printk(KERN_DEBUG "Dlc packet state: delay=%lld, loss=%d, curr_state=%u\n", 
-    //        pkt_state.delay, pkt_state.loss, q->dlc_model.main_chain.curr_state);
+    // printk(KERN_DEBUG "Dlc packet state: delay=%lld, loss=%d, curr_state=%u\n", 
+    //         pkt_state.delay, pkt_state.loss, q->dlc_model.main_chain.curr_state);
 
     /* Do not fool qdisc_drop_all() */
     skb->prev = NULL;
 
     if (pkt_state.loss) {
-        printk(KERN_DEBUG "Loss state, drop packet\n");
+        // printk(KERN_DEBUG "Loss state, drop packet\n");
         --count;
     }
     if (count == 0) {

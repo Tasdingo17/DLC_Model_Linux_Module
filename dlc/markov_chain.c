@@ -74,7 +74,8 @@ struct dlc_state* markov_chain_step(struct markov_chain *mc) {
 }
 
 void markov_chain_destroy(struct markov_chain *mc){
-    kvfree(&(mc->states));
+    kvfree(mc->states);
+    mc->states = NULL;
 }
 
 ///////////////////////////
@@ -113,5 +114,6 @@ struct dlc_const_state* markov_chain_const_step(struct markov_chain_const *mc) {
 }
 
 void markov_chain_const_destroy(struct markov_chain_const *mc){
-    kvfree(&(mc->states));
+    kvfree(mc->states);
+    mc->states = NULL;
 }

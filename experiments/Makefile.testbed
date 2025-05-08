@@ -13,9 +13,11 @@ setup-interfaces:
 	sudo ip netns exec h1 ip addr add 10.1.1.2/24 dev veth1
 	sudo ip netns exec h1 ip link set dev veth1 up
 
+	sudo iptables -A OUTPUT -o veth0 -p udp -j NFLOG --nflog-group 1
+
 setup: setup-interfaces
 	sudo insmod DLC_Model_module/sch_dlc_qdisc.ko
-	sudo iproute2_dlc/tc/tc qdisc add dev veth0 root dlc limit 10000 delay 10ms 2ms loss 1% mu 30% mean_burst_len 3 mean_good_burst_len 15 rate 50mbit
+	sudo iproute2_dlc/tc/tc qdisc add dev veth0 root dlc limit 10000 delay 10ms 2ms loss 1% mu 30% mean_burst_len 3 mean_good_burst_len 15 rate 100mbit
 
 check-setup:
 	sudo ip -br addr show veth0
@@ -27,9 +29,10 @@ test-ping:
 
 rebuild:
 	cd DLC_Model_module && $(MAKE)
-	cd iproute2_dlc && $(MAKE)
+	cd iproute2_dlc && ./configure && $(MAKE)
 
 cleanup:
+	sudo iptables -D OUTPUT -o veth0 -p udp -j NFLOG --nflog-group 1
 	sudo tc qdisc del dev veth0 root
 	sudo ip link del veth0
 	sudo ip netns del h1

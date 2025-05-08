@@ -44,7 +44,7 @@ sudo rmmod sch_dlc_qdisc
 sudo iproute2_dlc/tc/tc qdisc add dev veth0 root dlc limit 10000 delay 10ms 2ms loss 1% mu 30% mean_burst_len 3 mean_good_burst_len 15 rate 50mbit
 ```
 
-**Testbed**: check `Makefile.testbed` for testbed setup and work check.
+**Testbed**: check `experiments/Makefile.testbed` for testbed setup and work check.
 
 Note: `Makefile.testbed` supposes following directory structure:
 - Makefile

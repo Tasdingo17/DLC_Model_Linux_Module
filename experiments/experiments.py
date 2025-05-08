@@ -140,7 +140,7 @@ def analyze(exp_params: ExpParams) -> AnalyzeResults:
         cmd = f'tshark -r {SRV_FILE} -Y \"iperf3.sequence\" -e frame.number -e frame.time_epoch -e iperf3.sequence -E separator=, -T fields'
         subprocess.run(shlex.split(cmd), stdout=srv_csv, stderr=logfile, check=True)
 
-    max_delay = (exp_params.delay + exp_params.jitter) / 1000
+    max_delay = (exp_params.delay + exp_params.jitter) * 2 / 1000
     delays, losses = exp_utils.get_delay_and_loss(CLT_TMP_FILE, SRV_TMP_FILE, max_delay=max_delay)
     avg_loss = exp_utils.get_average_loss(losses)
     avg_delay = exp_utils.get_average_delay(delays, losses)
